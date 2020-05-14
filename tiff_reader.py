@@ -1,5 +1,6 @@
 import struct
 import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -74,26 +75,24 @@ class Tiff_Reader:
             self.nextifd_offset = self.firstrecord_offset
             self.read_next_frame()
 
-
     def close(self):
         self.file.close()
 
-    def read_int8(self, n = 1):
+    def read_int8(self, n=1):
         f = self.file
         if (self.byte_order == TIFF_ORDER_BIGENDIAN):
             return struct.unpack('>B' * n, f.read(1 * n))
         else:
             return struct.unpack('B' * n, f.read(1 * n))
 
-    def read_int16(self, n = 2):
+    def read_int16(self, n=2):
         f = self.file
         if (self.byte_order == TIFF_ORDER_BIGENDIAN):
             return struct.unpack('>H' * int(n/2), f.read(n))
         else:
             return struct.unpack('H' * int(n/2), f.read(n))
-    
 
-    def read_int32(self, n = 4):
+    def read_int32(self, n=4):
         f = self.file
         if (self.byte_order == TIFF_ORDER_BIGENDIAN):
             return struct.unpack('>i' * int(n/4), f.read(n))
@@ -161,10 +160,10 @@ class Tiff_Reader:
             ifd.value = ifd.pvalue[0]
         if (ifd.pvalue2):
             ifd.value2 = ifd.pvalue[0]
-        
+
         if (changepos):
             self.file.seek(pos)
-            self.file.seek(4, SEEK_CUR) 
+            self.file.seek(4, SEEK_CUR)
         return ifd
 
     class IFD:
@@ -195,7 +194,7 @@ class Tiff_Reader:
             ifd_count = self.read_int16()[0]
             for i in range(ifd_count):
                 ifd = self.read_ifd()
-                
+
                 tag = ifd.tag
                 if (tag == TIFF_FIELD_IMAGEWIDTH):
                     self.currentFrame.width = ifd.value
@@ -232,7 +231,7 @@ class Tiff_Reader:
             return False
         return True
 
-    def get_sample_data(self, buf, sample):
+    def get_sample_data(self, sample):
         if (self.file):
             if (self.currentFrame.compression != TIFF_COMPRESSION_NONE):
                 return False
@@ -242,19 +241,22 @@ class Tiff_Reader:
                 return False
             if (self.currentFrame.bitspersample[sample] not in (8, 16, 32)):
                 return False
-            
+
             pos = self.file.tell()
             tif = []
             if (self.currentFrame.stripcount > 0 and self.currentFrame.stripbytecounts and self.currentFrame.stripoffsets):
                 if (self.currentFrame.bitspersample[sample] == 8):
                     for i in range(self.currentFrame.stripcount):
                         self.file.seek(self.currentFrame.stripoffsets[i])
-                        buf = self.read_int8((self.currentFrame.stripbytecounts[i]))
+                        buf = self.read_int8(
+                            (self.currentFrame.stripbytecounts[i]))
+                        tif.append(buf)
                         offset = i * self.currentFrame.rowsperstrip * self.currentFrame.width
                 elif (self.currentFrame.bitspersample[sample] == 16):
                     for i in range(self.currentFrame.stripcount):
                         self.file.seek(self.currentFrame.stripoffsets[i])
-                        buf = self.read_int16((self.currentFrame.stripbytecounts[i]))
+                        buf = self.read_int16(
+                            (self.currentFrame.stripbytecounts[i]))
                         tif.append(buf)
                         offset = i * self.currentFrame.rowsperstrip * self.currentFrame.width
                         pixels = self.currentFrame.rowsperstrip * self.currentFrame.width
@@ -264,7 +266,9 @@ class Tiff_Reader:
                 elif (self.currentFrame.bitspersample[sample] == 32):
                     for i in range(self.currentFrame.stripcount):
                         self.file.seek(self.currentFrame.stripoffsets[i])
-                        buf = self.read_int32((self.currentFrame.stripbytecounts[i]))
+                        buf = self.read_int32(
+                            (self.currentFrame.stripbytecounts[i]))
+                        tif.append(buf)
                         offset = i * self.currentFrame.rowsperstrip * self.currentFrame.width
             else:
                 return False
@@ -275,14 +279,13 @@ class Tiff_Reader:
             return True
         return False
 
-
     class StripFrame:
 
         def __init__(self):
             self.width = 0
             self.height = 0
-            self.compression = TIFF_COMPRESSION_NONE 
-            
+            self.compression = TIFF_COMPRESSION_NONE
+
             self.rowsperstrip = 0
             self.stripoffsets = []
             self.stripbytecounts = []
@@ -290,7 +293,7 @@ class Tiff_Reader:
             self.samplesperpixel = 1
             self.bitspersample = []
             self.planarconfiguration = TIFF_PLANARCONFIG_PLANAR
-            self.sampleformat = TINYTIFFREADER_SAMPLEFORMAT_UINT 
+            self.sampleformat = TINYTIFFREADER_SAMPLEFORMAT_UINT
 
             self.description = ''
 
@@ -305,36 +308,26 @@ class Tiff_Reader:
                 self.file.seek(count * 12, SEEK_CUR)
                 next_offset = self.read_int32()[0]
                 frames += 1
-            
+
             self.file.seek(pos)
             return frames
-    
+
+
 if __name__ == "__main__":
     tiff_reader = Tiff_Reader()
-    tiff_reader.open('')
+    tiff_reader.open('your_strip_nocompress_file.tif')
     ok = True
     frame = 0
 
     frames = tiff_reader.count_frames()
     while (True):
-        width = tiff_reader.currentFrame.width
-        height = tiff_reader.currentFrame.height
-        ok = (width == 6001) and (height == 6001)
-        if not ok:
-            print('ERROR in frame: size does not match, read width: %d, height: %d, expected width: %d, height: %d.', width, height, 6001, 6001)
-        if ok:
-            buf = ()
-            ret = tiff_reader.get_sample_data(buf, 0)
-            if not ret:
-                print('ERROR: get_sample_data')
-            # if (frame % 2 == 0):
-            #     for i in range(width * height):
-            frame += 1
+        ret = tiff_reader.get_sample_data(0)
+        if not ret:
+            print('ERROR: get_sample_data')
+        frame += 1
         if not tiff_reader.read_next_frame():
             break
-    
+
     print('frames: %d, frame: %d', frames, frame)
 
     tiff_reader.close()
-
-
